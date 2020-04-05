@@ -1,0 +1,186 @@
+---
+title: "Spotify"
+author: "Carl Schmidt"
+date: "05.04.2020"
+output: 
+  html_document:
+    df_print: paged       # allows to click trough data frames interactively
+    toc: true             # creates a Tabe of Contents (ToC)
+    toc_float: true       # makes the ToC float
+    highlight: tango      # sets the color scheme for the code chunks
+    number_sections: true # numers headlines
+---
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(lubridate)
+```
+
+# Read in the data
+```{r}
+spotify_data = readRDS("spotify.Rds")
+```
+
+# Get an overview of the data
+
+## Get a first overview
+```{r}
+# Get the class of `spotify_data`
+class(spotify_data)
+
+# Get the storage type of `spotify_data`
+typeof(spotify_data)
+
+# Get the dimnesions of `spotify_data`
+dim(spotify_data)
+
+# Get the name and the mode (i.e. data type) of each column
+name_mode = c(Column=NA, Mode=NA)
+for (name in names(spotify_data)) {
+  # Extract the corresponding column
+  curr_column <- spotify_data[[name]]
+  # append the new pair of name and mode at the end of `name_mode`
+  name_mode <- bind_rows(name_mode, c(Column=name, Mode=mode(curr_column)))
+}
+name_mode[-1,]
+```
+
+## Get a feeling for the data
+```{r}
+# Number of distinct artists
+spotify_data %>% summarise(n_distinct(artist))
+
+# Number of observations per genre, sorted in descending order
+spotify_data %>% count(genre) %>% arrange(-n)
+
+# First five tracks classified as explicit
+spotify_data %>% filter(track.explicit == TRUE) %>% head()
+
+# Obtain the mean danceability for explicit and non-explicit tracks I (does allow renaming)
+spotify_data %>% group_by(track.explicit) %>% summarise(renamed_col=mean(danceability))
+
+# Obtain the mean danceability for explicit and non-explicit tracks II (doesn't allow renaming)
+spotify_data %>% aggregate(danceability ~ track.explicit, ., mean)
+
+# Count the explicit tracks in each genres
+spotify_data %>% group_by(genre) %>% summarise(sum(track.explicit)) %>% arrange(-`sum(track.explicit)`)
+
+# Count the explicit tracks in the genre hiphop and all other genres
+spotify_data %>% group_by(genre=="hiphop") %>% summarise(sum(track.explicit))
+
+# Get an overvie over the genres
+spotify_data %>% select(genre) %>% unique()
+```
+
+# Simple scatter plot
+
+## Mapping `valence` (i.e. happyness) on the x axis, and `speechiness` on the y axis
+```{r}
+spotify_data %>% ggplot(mapping = aes(x=valence,  y=speechiness)) + geom_point()
+```
+
+## Some interesting relationships?
+```{r}
+spotify_data %>% ggplot(mapping = aes(x=genre,  y=danceability)) + geom_point()
+```
+```{r}
+spotify_data %>% ggplot(mapping = aes(x=loudness,  y=energy)) + geom_point()
+```
+
+# Multidimensional scatterplot
+
+## Messy Plot
+```{r}
+spotify_data %>% ggplot(mapping = aes(x=loudness, y=energy,
+                                      size=track.popularity, color=genre,
+                                      alpha=danceability)) +  # `alpha` does not work for `genre`!
+  scale_alpha_continuous(trans="reverse") + # reverse the `alpha` scale
+  geom_point()
+```
+
+## Jittered Plot
+```{r}
+spotify_data  %>% mutate(track.album.release_date =
+                           ifelse(nchar(track.album.release_date)==4,
+                                  as.Date(track.album.release_date, format="%Y"), 
+                                  ymd(track.album.release_date, quiet=TRUE))) %>%
+  ggplot(mapping = aes(x=genre, y=track.popularity,
+                       color=track.album.release_date, alpha=danceability)) + 
+  geom_point() +
+  geom_jitter()
+```
+
+## Reorder based on `genre`
+```{r}
+unique_genre <- spotify_data %>%
+  select(genre) %>% 
+  unique() %>% 
+  pull() %>% # make a vector out of the tibble
+  as.character()
+
+spotify_data  %>% 
+  mutate(genre = factor(genre, levels=unique_genre[unique_genre %>%
+                                                     order(decreasing=TRUE)])) %>% 
+  select(genre) %>% 
+  mutate(fac_num = as.numeric(genre)) %>% 
+  unique()
+```
+```{r}
+spotify_data  %>% 
+  mutate(genre = factor(genre, levels=unique_genre[unique_genre %>%
+                                                     order(decreasing=TRUE)])) %>% 
+  mutate(track.album.release_date =
+           ifelse(nchar(track.album.release_date)==4,
+                  as.Date(track.album.release_date, format="%Y"),
+                  ymd(track.album.release_date, quiet=TRUE))) %>%
+  ggplot(mapping = aes(x=genre, y=track.popularity,
+                       color=track.album.release_date, alpha=danceability)) + 
+  geom_point() +
+  geom_jitter()
+```
+
+# Scaling
+```{r}
+spotify_data  %>%
+  mutate(track.album.release_date =
+           ifelse(nchar(track.album.release_date)==4,
+                  as.Date(track.album.release_date, format="%Y"),
+                  ymd(track.album.release_date, quiet=TRUE))) %>%
+  ggplot(mapping = aes(x=genre, y=track.popularity,
+                       color=track.album.release_date, alpha=danceability)) + 
+  geom_point() +
+  geom_jitter() +
+  scale_colour_gradient(
+    low = "#132B43",
+    high = "#56B1F7",
+    space = "Lab",
+    na.value = "grey50",
+    guide = "colourbar"    # Type of legend. Either "colourbar" or "legend"
+    ) +
+  scale_alpha(
+    range = c(0.5, 1),
+    guide = "legend"       # << Guide 'colorbar' cannot be used for 'alpha'.>>
+    ) +         
+  scale_y_continuous(
+    trans = "pseudo_log"
+    )
+```
+
+# Facetting
+```{r}
+spotify_data  %>% 
+  mutate(genre = factor(genre, levels=unique_genre[unique_genre %>%
+                                                     order(decreasing=TRUE)])) %>% 
+  mutate(track.album.release_date =
+           ifelse(nchar(track.album.release_date)==4,
+                  as.Date(track.album.release_date, format="%Y"),
+                  ymd(track.album.release_date, quiet=TRUE))) %>%
+  ggplot(mapping = aes(x=energy, y=loudness,
+                       color=track.explicit, size=danceability, alpha=valence)) + 
+  geom_point() +
+  scale_size_continuous(
+    range=c(0.1,1.5)
+  ) + 
+  facet_wrap(vars(genre))
+```
+
