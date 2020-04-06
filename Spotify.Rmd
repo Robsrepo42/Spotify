@@ -126,9 +126,10 @@ spotify_data  %>%
   unique()
 ```
 ```{r}
+sorted_genre <- unique_genre %>% sort(decreasing=TRUE)
+
 spotify_data  %>% 
-  mutate(genre = factor(genre, levels=unique_genre[unique_genre %>%
-                                                     order(decreasing=TRUE)])) %>% 
+  mutate(genre = factor(genre, levels=sorted_genre)) %>% 
   mutate(track.album.release_date =
            ifelse(nchar(track.album.release_date)==4,
                   as.Date(track.album.release_date, format="%Y"),
@@ -136,7 +137,14 @@ spotify_data  %>%
   ggplot(mapping = aes(x=genre, y=track.popularity,
                        color=track.album.release_date, alpha=danceability)) + 
   geom_point() +
-  geom_jitter()
+  geom_jitter() + 
+  scale_x_discrete(breaks=sorted_genre,
+                   # use order(..., decreasing=TRUE) to match the order of `sorted_genre`
+                   labels=ifelse(order(sorted_genre, decreasing=TRUE)%%2==0,
+                                 # add a new line ("\n") in the front of the label
+                                 paste("\n", sorted_genre, sep=""),
+                                 # simply use the label
+                                 sorted_genre))
 ```
 
 # Scaling
