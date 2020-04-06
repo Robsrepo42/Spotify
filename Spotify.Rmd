@@ -183,4 +183,26 @@ spotify_data  %>%
   ) + 
   facet_wrap(vars(genre))
 ```
+## sadsd
+```{r}
+spotify_data  %>% 
+  mutate(genre = factor(genre, levels=unique_genre[unique_genre %>%
+                                                     order(decreasing=TRUE)])) %>% 
+  mutate(track.album.release_date =
+           ifelse(nchar(track.album.release_date)==4,
+                  as.Date(track.album.release_date, format="%Y"),
+                  ymd(track.album.release_date, quiet=TRUE))) %>%
+  ## DIFFERENT TO THE ONE ABOVE ##
+  group_by(genre) %>% 
+  mutate(ordered_popularity=order(track.popularity)/n()) %>%
+  ungroup() %>% 
+  ################################
+  ggplot(mapping = aes(x=energy, y=loudness,
+                       color=ordered_popularity, size=danceability, alpha=valence)) + 
+  geom_point() +
+  scale_size_continuous(
+    range=c(0.1,1.5)
+  ) + 
+  facet_wrap(vars(genre))
+```
 
